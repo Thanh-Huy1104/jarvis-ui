@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+/* You can add custom overrides below, but the line above is all you need */
+body {
+    background: #050508;
+}
+
+/* Custom utility to hide scrollbars */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
