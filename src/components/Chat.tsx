@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Command, Terminal, Copy, Check, Sparkles, Zap } from 'lucide-react';
+import { Command, Copy, Check, Zap } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 // NOTE: For local syntax highlighting, uncomment these lines after installing 'react-syntax-highlighter'
 // import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 // import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -87,6 +89,8 @@ export default function Chat({ messages }: ChatProps) {
                     <div className={`font-serif ${isUser ? 'font-medium' : 'font-normal'}`}>
                       {msg.text ? (
                         <ReactMarkdown
+                          remarkPlugins={[remarkMath]}
+                          rehypePlugins={[rehypeKatex]}
                           components={{
                             // --- Claude-Style Code Block (Native Implementation) ---
                             code({ node, inline, className, children, ...props }: any) {
@@ -100,7 +104,7 @@ export default function Chat({ messages }: ChatProps) {
                                   {/* Minimal Header */}
                                   <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] border-b border-white/5 text-gray-400">
                                     <span className="text-xs lowercase select-none">
-                                      {match[1] || 'code'}
+                                      {match && match[1] ? match[1] : 'code'}
                                     </span>
                                     <button
                                       onClick={() => handleCopy(codeString, uniqueId)}
