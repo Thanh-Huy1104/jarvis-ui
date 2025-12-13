@@ -393,5 +393,20 @@ export function useEve(apiEndpoint: string, isPersistent = false) {
 
     useEffect(() => { return () => disconnect(); }, [disconnect]);
 
-    return { status, messages, analyserNode, connect, disconnect, startRecording, stopRecording, clearMessages, cancelRecording };
+    const sendTextMessage = (text: string) => {
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+            const userMessage: Message = {
+                id: `msg-${Date.now()}`,
+                source: 'user',
+                text,
+            };
+            setMessages(prev => [...prev, userMessage]);
+            socketRef.current.send(JSON.stringify({ type: 'text_input', text }));
+            setStatus('processing');
+        } else {
+            console.error("WebSocket is not open. Cannot send message.");
+        }
+    };
+
+    return { status, messages, analyserNode, connect, disconnect, startRecording, stopRecording, clearMessages, cancelRecording, sendTextMessage };
 }

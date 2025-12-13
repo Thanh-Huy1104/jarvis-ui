@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Command, Copy, Check, Zap } from 'lucide-react';
+import { Command, Copy, Check, Zap, Send, ChevronDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -12,11 +12,26 @@ import type { Message } from '../hooks/useEve';
 interface ChatProps {
   messages: Message[];
   onClear?: () => void;
+  onSendMessage?: (message: string) => void;
 }
 
-export default function Chat({ messages }: ChatProps) {
+export default function Chat({ messages, onSendMessage }: ChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [input, setInput] = useState('');
+  const [expandedThoughts, setExpandedThoughts] = useState<Set<string>>(new Set());
+
+  const handleToggleThought = (msgId: string) => {
+    setExpandedThoughts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(msgId)) {
+        newSet.delete(msgId);
+      } else {
+        newSet.add(msgId);
+      }
+      return newSet;
+    });
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -27,6 +42,14 @@ export default function Chat({ messages }: ChatProps) {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (input.trim() && onSendMessage) {
+      onSendMessage(input.trim());
+      setInput('');
+    }
   };
 
   return (
@@ -54,6 +77,24 @@ export default function Chat({ messages }: ChatProps) {
           {messages.map((msg, index) => {
             const isUser = msg.source === 'user';
 
+            let thinkingContent: string | null = null;
+            let mainContent = msg.text;
+
+            if (!isUser && msg.text) {
+              const thinkRegex = /<think>(.*?)<\/think>/s;
+              const thinkMatch = msg.text.match(thinkRegex);
+
+              if (thinkMatch) {
+                thinkingContent = thinkMatch[1].trim();
+                mainContent = msg.text.substring(thinkMatch[0].length).trim();
+              } else if (msg.text.startsWith('<think>')) {
+                thinkingContent = msg.text.substring('<think>'.length);
+                mainContent = '';
+              }
+            }
+
+            const isThoughtExpanded = expandedThoughts.has(msg.id);
+
             return (
               <motion.div
                 key={msg.id}
@@ -66,13 +107,36 @@ export default function Chat({ messages }: ChatProps) {
               >
                 <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} ${isUser ? 'max-w-[85%]' : 'max-w-full'}`}>
 
-                  {/* Assistant Label */}
-                  {!isUser && (
-                    <div className="flex items-center gap-1.5 mb-2 ml-1">
-                      <Zap className="w-3 h-3 text-cyan-500 fill-cyan-500/20" />
-                      <span className="text-[10px] font-bold tracking-[0.25em] bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent uppercase font-sans">
-                        Eve
-                      </span>
+                  {thinkingContent && (
+                    <div className="w-full text-sm font-mono text-gray-600 mb-2">
+                      <button
+                        onClick={() => handleToggleThought(msg.id)}
+                        className="w-full flex items-center py-2 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Zap size={14} className="text-cyan-500" />
+                          <span className="italic text-gray-500">Thought Process</span>
+                          <motion.div animate={{ rotate: isThoughtExpanded ? 180 : 0 }}>
+                            <ChevronDown size={16} className="text-gray-500" />
+                          </motion.div>
+                        </div>
+
+                      </button>
+                      <AnimatePresence>
+                        {isThoughtExpanded && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.3, ease: 'easeOut' }}
+                            className="overflow-hidden"
+                          >
+                            <div className="px-4 pb-3 pt-1 pl-4 border-l-2 border-gray-300 text-gray-600 whitespace-pre-wrap">
+                              {thinkingContent}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   )}
 
@@ -87,7 +151,7 @@ export default function Chat({ messages }: ChatProps) {
                     `}
                   >
                     <div className={`font-serif ${isUser ? 'font-medium' : 'font-normal'}`}>
-                      {msg.text ? (
+                      {mainContent ? (
                         <ReactMarkdown
                           remarkPlugins={[remarkMath]}
                           rehypePlugins={[rehypeKatex]}
@@ -153,11 +217,11 @@ export default function Chat({ messages }: ChatProps) {
                             blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-indigo-200 pl-4 italic text-gray-500 my-4" {...props} />,
                           }}
                         >
-                          {msg.text}
+                          {isUser ? msg.text : mainContent}
                         </ReactMarkdown>
                       ) : (
                         // Typing Indicator
-                        <div className="flex gap-1.5 items-center h-6 px-1 opacity-50">
+                        !thinkingContent && <div className="flex gap-1.5 items-center h-6 px-1 opacity-50">
                           <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-[bounce_1.4s_infinite] [animation-delay:-0.32s]" />
                           <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-[bounce_1.4s_infinite] [animation-delay:-0.16s]" />
                           <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-[bounce_1.4s_infinite]" />
@@ -173,6 +237,28 @@ export default function Chat({ messages }: ChatProps) {
 
         <div ref={bottomRef} className="h-4" />
       </div>
+
+      {onSendMessage && (
+        <div className="border-t border-gray-200/60 p-4 bg-white/60">
+          <form onSubmit={handleFormSubmit} className="relative">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Or type a message..."
+              className="w-full bg-gray-100 border-gray-300 rounded-full pl-5 pr-14 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-shadow font-serif"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  handleFormSubmit(e);
+                }
+              }}
+            />
+            <button type="submit" disabled={!input.trim()} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-indigo-500 text-white disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+              <Send size={16} />
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

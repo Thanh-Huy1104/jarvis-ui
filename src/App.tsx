@@ -7,7 +7,7 @@ import { Activity, ArrowRight, Power } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 export default function App() {
-  const [apiEndpoint, setApiEndpoint] = useState('http://127.0.0.1:8080');
+  const [apiEndpoint, setApiEndpoint] = useState('https://192.168.5.215:8080');
   const [isPersistent, setIsPersistent] = useState(false);
   const [showChat, setShowChat] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
@@ -22,7 +22,8 @@ export default function App() {
     startRecording,
     stopRecording,
     clearMessages,
-    cancelRecording
+    cancelRecording,
+    sendTextMessage
   } = useEve(apiEndpoint, isPersistent) as {
     status: 'idle' | 'listening' | 'processing' | 'speaking' | 'disconnected';
     messages: any;
@@ -33,6 +34,7 @@ export default function App() {
     stopRecording: () => void;
     clearMessages: () => void;
     cancelRecording: () => void;
+    sendTextMessage: (text: string) => void;
   };
 
   // Effect to connect on mount and disconnect on unmount
@@ -249,7 +251,7 @@ export default function App() {
 
       {/* Main Content */}
       <div className="w-full flex h-2/5 justify-center">
-        {showChat && <Chat messages={messages} onClear={clearMessages} />}
+        {showChat && <Chat messages={messages} onClear={clearMessages} onSendMessage={sendTextMessage} />}
       </div>
       <Controls
         onDisconnect={disconnect}
