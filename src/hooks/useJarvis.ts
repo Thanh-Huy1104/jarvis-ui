@@ -179,7 +179,7 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
             const results = event.results;
             const transcript = results[results.length - 1][0].transcript.toLowerCase().trim();
             if (transcript.includes("jarvis") || transcript.includes("hey jarvis")) {
-                console.log("✨ Wake word detected!");
+                console.log("Wake word detected: Jarvis");
                 recognition.stop();
                 wakeWordRecognitionRef.current = null;
                 startRecordingRef.current(); 

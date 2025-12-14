@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Check, ChevronDown, ArrowUp, Zap } from 'lucide-react';
+import { Copy, Check, ChevronDown, ArrowUp, Zap, Mic } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -15,9 +15,12 @@ interface ChatProps {
   onClear?: () => void;
   onSendMessage?: (message: string) => void;
   isConnected?: boolean;
+  isListening?: boolean;
+  onStartRecording?: () => void;
+  onStopRecording?: () => void;
 }
 
-export default function Chat({ messages, onSendMessage, isConnected = true }: ChatProps) {
+export default function Chat({ messages, onSendMessage, isConnected = true, isListening = false, onStartRecording, onStopRecording }: ChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -298,9 +301,9 @@ export default function Chat({ messages, onSendMessage, isConnected = true }: Ch
               rows={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              disabled={!isConnected}
-              placeholder={isConnected ? "Ask Jarvis anything..." : "Connecting to server..."}
-              className="w-full bg-transparent border-0 resize-none pl-5 pr-14 pt-2 text-[14px] focus:outline-none focus:ring-0 font-serif disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!isConnected || isListening}
+              placeholder={isListening ? "Listening..." : isConnected ? "Ask Jarvis anything..." : "Connecting to server..."}
+              className="w-full bg-transparent border-0 resize-none pl-5 pr-24 pt-2 text-[14px] focus:outline-none focus:ring-0 font-serif disabled:opacity-50 disabled:cursor-not-allowed"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -308,13 +311,28 @@ export default function Chat({ messages, onSendMessage, isConnected = true }: Ch
                 }
               }}
             />
+            {onStartRecording && onStopRecording && (
+              <motion.button
+                type="button"
+                disabled={!isConnected}
+                onClick={isListening ? onStopRecording : onStartRecording}
+                animate={{
+                  scale: isListening ? 1.1 : 1,
+                  backgroundColor: isListening ? '#ef4444' : '#6366f1',
+                }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className="absolute right-14 top-1/2 -translate-y-1/2 p-2 rounded-md text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Mic size={16} className={isListening ? 'animate-pulse' : ''} />
+              </motion.button>
+            )}
             <motion.button
               type="submit"
-              disabled={!input.trim() || !isConnected}
+              disabled={!input.trim() || !isConnected || isListening}
               animate={{
-                scale: input.trim() && isConnected ? 1 : 0.9,
-                opacity: input.trim() && isConnected ? 1 : 0.5,
-                backgroundColor: input.trim() && isConnected ? '#2d2d2dff' : '#d1d5db',
+                scale: input.trim() && isConnected && !isListening ? 1 : 0.9,
+                opacity: input.trim() && isConnected && !isListening ? 1 : 0.5,
+                backgroundColor: input.trim() && isConnected && !isListening ? '#2d2d2dff' : '#d1d5db',
               }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-md text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:cursor-not-allowed"

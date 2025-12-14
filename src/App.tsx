@@ -12,7 +12,9 @@ export default function App() {
     connect,
     disconnect,
     clearMessages,
-    sendTextMessage
+    sendTextMessage,
+    startRecording,
+    stopRecording
   } = useJarvis(apiEndpoint, isPersistent);
 
   // Effect to connect on mount and disconnect on unmount
@@ -29,7 +31,10 @@ export default function App() {
         messages={messages} 
         onClear={clearMessages} 
         onSendMessage={sendTextMessage} 
-        isConnected={status !== 'disconnected'} 
+        isConnected={status !== 'disconnected'}
+        isListening={status === 'listening'}
+        onStartRecording={startRecording}
+        onStopRecording={stopRecording}
       />
     </div>
   );
