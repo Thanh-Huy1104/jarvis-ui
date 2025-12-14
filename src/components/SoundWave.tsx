@@ -1,7 +1,8 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import type { EveStatus } from '../hooks/useEve';
+import type { JarvisStatus } from '../hooks/useJarvis';
+import Spinner from './Spinner';
 
 function SpikyOrb({ analyser }: { analyser: AnalyserNode | null }) {
     const meshRef = useRef<THREE.Mesh>(null!);
@@ -85,17 +86,20 @@ function SpikyOrb({ analyser }: { analyser: AnalyserNode | null }) {
 
 interface SoundWaveProps {
     analyserNode: AnalyserNode | null;
-    status: EveStatus;
+    status: JarvisStatus;
 }
 
 export default function SoundWave({ analyserNode, status }: SoundWaveProps) {
     return (
-        <div className="w-full h-full min-h-[300px] bg-white rounded-3xl overflow-hidden relative">
-            <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
-                <color attach="background" args={['#ffffff']} />
-                <ambientLight intensity={0.5} />
-                <SpikyOrb analyser={analyserNode} />
-            </Canvas>
+        <div className="w-full h-full min-h-[300px] bg-white rounded-3xl overflow-hidden relative flex items-center justify-center">
+            {status === 'thinking' && <Spinner />}
+            {status === 'listening' && (
+                <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
+                    <color attach="background" args={['#ffffff']} />
+                    <ambientLight intensity={0.5} />
+                    <SpikyOrb analyser={analyserNode} />
+                </Canvas>
+            )}
         </div>
     );
 }

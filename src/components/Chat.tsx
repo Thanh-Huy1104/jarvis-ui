@@ -1,22 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Command, Copy, Check, Zap, Send, ChevronDown } from 'lucide-react';
+import { Copy, Check, ChevronDown, ArrowUp, Zap } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 // NOTE: For local syntax highlighting, uncomment these lines after installing 'react-syntax-highlighter'
 // import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 // import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import type { Message } from '../hooks/useEve';
+import type { Message } from '../hooks/useJarvis';
+import Spinner from './Spinner';
 
 interface ChatProps {
   messages: Message[];
   onClear?: () => void;
   onSendMessage?: (message: string) => void;
+  isConnected?: boolean;
 }
 
-export default function Chat({ messages, onSendMessage }: ChatProps) {
+export default function Chat({ messages, onSendMessage, isConnected = true }: ChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [input, setInput] = useState('');
   const [expandedThoughts, setExpandedThoughts] = useState<Set<string>>(new Set());
@@ -37,6 +40,21 @@ export default function Chat({ messages, onSendMessage }: ChatProps) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const scrollHeight = textareaRef.current.scrollHeight;
+      const maxHeight = 200; // Max height for textarea
+      if (scrollHeight > maxHeight) {
+        textareaRef.current.style.height = `${maxHeight}px`;
+        textareaRef.current.style.overflowY = 'auto';
+      } else {
+        textareaRef.current.style.height = `${scrollHeight}px`;
+        textareaRef.current.style.overflowY = 'hidden';
+      }
+    }
+  }, [input]);
+
   // Helper to copy code to clipboard with visual feedback
   const handleCopy = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
@@ -53,7 +71,7 @@ export default function Chat({ messages, onSendMessage }: ChatProps) {
   };
 
   return (
-    <div className="flex-1 w-full max-w-2xl flex flex-col overflow-hidden relative z-10 border-x border-b border-t-0 border-gray-200/60 rounded-3xl bg-white/60 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-4 ring-1 ring-white/50">
+    <div className="flex-1 w-full max-w-2xl flex flex-col overflow-hidden relative z-10 rounded-3xl bg-white/60 mb-4 ring-1 ring-white/50">
 
       {/* Visual Fade Overlay */}
       <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-white to-transparent z-20 pointer-events-none rounded-t-3xl" />
@@ -62,15 +80,36 @@ export default function Chat({ messages, onSendMessage }: ChatProps) {
 
         {/* Empty State */}
         {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-gray-300 space-y-6 opacity-60">
-            <div className="relative group">
-              <div className="absolute inset-0 bg-indigo-100 blur-3xl rounded-full opacity-40 group-hover:opacity-60 transition-opacity" />
-              <Command className="w-12 h-12 relative z-10 text-gray-300" strokeWidth={3} />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="h-full flex flex-col items-center justify-center space-y-8"
+          >
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-200/30 via-purple-200/30 to-pink-200/30 blur-3xl rounded-full opacity-60" />
+              <div className="relative space-y-4 text-center">
+                <h1 className="text-7xl font-thin tracking-tight text-gray-800">Jarvis</h1>
+                <div className="flex items-center justify-center gap-2">
+                  <div className={`w-2 h-2 rounded-full transition-colors ${isConnected ? 'bg-green-400' : 'bg-amber-400 animate-pulse'}`} />
+                  <p className="text-xs text-gray-400 font-mono tracking-wider uppercase">
+                    {isConnected ? 'Online' : 'Connecting...'}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="text-center space-y-2">
-              <p className="text-[11px] text-gray-400 font-mono tracking-wide">Awaiting vocal input...</p>
+            
+            <div className="max-w-md space-y-4 text-center px-6">
+              <p className="text-sm text-gray-500 leading-relaxed">
+                Your intelligent assistant powered by advanced AI. Ask questions, get insights, or have a conversation.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-gray-400">
+                <span className="px-3 py-1 rounded-full bg-gray-100">Web Search</span>
+                <span className="px-3 py-1 rounded-full bg-gray-100">Code Analysis</span>
+                <span className="px-3 py-1 rounded-full bg-gray-100">Real-time Info</span>
+              </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         <AnimatePresence initial={false} mode='popLayout'>
@@ -79,17 +118,23 @@ export default function Chat({ messages, onSendMessage }: ChatProps) {
 
             let thinkingContent: string | null = null;
             let mainContent = msg.text;
+            let isThinkingComplete = false;
 
             if (!isUser && msg.text) {
-              const thinkRegex = /<think>(.*?)<\/think>/s;
-              const thinkMatch = msg.text.match(thinkRegex);
-
-              if (thinkMatch) {
-                thinkingContent = thinkMatch[1].trim();
-                mainContent = msg.text.substring(thinkMatch[0].length).trim();
-              } else if (msg.text.startsWith('<think>')) {
-                thinkingContent = msg.text.substring('<think>'.length);
-                mainContent = '';
+              // Extract all <think> content
+              const thinkMatches = msg.text.match(/<think>([\s\S]*?)(<\/think>|$)/g);
+              
+              if (thinkMatches) {
+                // Extract thinking content
+                thinkingContent = thinkMatches.map(match => 
+                  match.replace(/<\/?think>/g, '').trim()
+                ).filter(content => content).join('\n');
+                
+                // Check if thinking is complete (has closing tag)
+                isThinkingComplete = msg.text.includes('</think>');
+                
+                // Remove all <think> blocks from main content
+                mainContent = msg.text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
               }
             }
 
@@ -114,7 +159,11 @@ export default function Chat({ messages, onSendMessage }: ChatProps) {
                         className="w-full flex items-center py-2 cursor-pointer"
                       >
                         <div className="flex items-center gap-2">
-                          <Zap size={14} className="text-cyan-500" />
+                          {isThinkingComplete ? (
+                            <Zap size={14} className="text-cyan-500" />
+                          ) : (
+                            <Spinner />
+                          )}
                           <span className="italic text-gray-500">Thought Process</span>
                           <motion.div animate={{ rotate: isThoughtExpanded ? 180 : 0 }}>
                             <ChevronDown size={16} className="text-gray-500" />
@@ -150,8 +199,15 @@ export default function Chat({ messages, onSendMessage }: ChatProps) {
                       }
                     `}
                   >
-                    <div className={`font-serif ${isUser ? 'font-medium' : 'font-normal'}`}>
-                      {mainContent ? (
+                    <div 
+                      className={`font-serif ${isUser ? 'font-medium' : 'font-normal'} ${
+                        !isUser && mainContent ? 'animate-text-reveal' : ''
+                      }`}
+                      style={{
+                        '--text-reveal-duration': '0.8s'
+                      } as React.CSSProperties}
+                    >
+                      {mainContent && (
                         <ReactMarkdown
                           remarkPlugins={[remarkMath]}
                           rehypePlugins={[rehypeKatex]}
@@ -219,13 +275,6 @@ export default function Chat({ messages, onSendMessage }: ChatProps) {
                         >
                           {isUser ? msg.text : mainContent}
                         </ReactMarkdown>
-                      ) : (
-                        // Typing Indicator
-                        !thinkingContent && <div className="flex gap-1.5 items-center h-6 px-1 opacity-50">
-                          <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-[bounce_1.4s_infinite] [animation-delay:-0.32s]" />
-                          <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-[bounce_1.4s_infinite] [animation-delay:-0.16s]" />
-                          <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-[bounce_1.4s_infinite]" />
-                        </div>
                       )}
                     </div>
                   </div>
@@ -239,23 +288,39 @@ export default function Chat({ messages, onSendMessage }: ChatProps) {
       </div>
 
       {onSendMessage && (
-        <div className="border-t border-gray-200/60 p-4 bg-white/60">
-          <form onSubmit={handleFormSubmit} className="relative">
-            <input
-              type="text"
+        <div className="p-4 bg-white/60">
+          <form
+            onSubmit={handleFormSubmit}
+            className="relative bg-white/80 backdrop-blur-sm rounded-xl py-2 border border-gray-300/50 shadow-sm transition-all duration-300"
+          >
+            <textarea
+              ref={textareaRef}
+              rows={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Or type a message..."
-              className="w-full bg-gray-100 border-gray-300 rounded-full pl-5 pr-14 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-shadow font-serif"
+              disabled={!isConnected}
+              placeholder={isConnected ? "Ask Jarvis anything..." : "Connecting to server..."}
+              className="w-full bg-transparent border-0 resize-none pl-5 pr-14 pt-2 text-[14px] focus:outline-none focus:ring-0 font-serif disabled:opacity-50 disabled:cursor-not-allowed"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
                   handleFormSubmit(e);
                 }
               }}
             />
-            <button type="submit" disabled={!input.trim()} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-indigo-500 text-white disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-              <Send size={16} />
-            </button>
+            <motion.button
+              type="submit"
+              disabled={!input.trim() || !isConnected}
+              animate={{
+                scale: input.trim() && isConnected ? 1 : 0.9,
+                opacity: input.trim() && isConnected ? 1 : 0.5,
+                backgroundColor: input.trim() && isConnected ? '#2d2d2dff' : '#d1d5db',
+              }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-md text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:cursor-not-allowed"
+            >
+              <ArrowUp size={16} />
+            </motion.button>
           </form>
         </div>
       )}
