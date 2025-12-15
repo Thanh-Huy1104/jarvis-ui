@@ -112,7 +112,7 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
 
     // --- Helper Functions ---
     const startRecording = useCallback(async () => {
-        stopWakeWordListener(); 
+        // Removed wake word listener
 
         if (!isMicInitialized.current) {
             await initMic();
@@ -128,19 +128,30 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
 
         speechDetectedRef.current = false;
         stream.getAudioTracks().forEach(t => t.enabled = true);
-        const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        
+        // Safari iOS compatibility: Use mp4 if webm not supported
+        let mimeType = 'audio/webm';
+        if (!MediaRecorder.isTypeSupported('audio/webm')) {
+            if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                mimeType = 'audio/mp4';
+            } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+                mimeType = 'audio/wav';
+            }
+        }
+        
+        const recorder = new MediaRecorder(stream, { mimeType });
         const chunks: BlobPart[] = [];
 
         recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
         recorder.onstop = () => {
-            const blob = new Blob(chunks, { type: 'audio/webm' });
-            if (blob.size > 2000 && speechDetectedRef.current) {
+            const blob = new Blob(chunks, { type: mimeType });
+            if (blob.size > 1000) { // Minimum size check only
                 if (socketRef.current?.readyState === WebSocket.OPEN) {
                     setStatus('processing');
                     blob.arrayBuffer().then(buffer => socketRef.current?.send(buffer));
                 }
             } else {
-                console.log("Ignored recording (silence). Back to idle.");
+                console.log("Recording too short. Back to idle.");
                 setStatus('idle');
             }
         };
@@ -148,7 +159,7 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
         recorderRef.current = recorder;
         recorder.start();
         setStatus('listening');
-        monitorVAD(stream, recorder);
+        // VAD removed - manual stop only
     }, [initMic]);
 
     useEffect(() => {
@@ -220,6 +231,7 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
         const buffer = new Uint8Array(analyser.frequencyBinCount);
         let speechSeen = false;
         let silenceMs = 0;
+        let speechDurationMs = 0; // Track how long speech has been detected
         const startTime = Date.now();
 
         const loop = () => {
@@ -240,14 +252,21 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
             const vol = relevantBins.reduce((a, b) => a + b, 0) / relevantBins.length;
 
             // 2. SENSITIVITY ADJUSTMENT
-            // vol > 20 (was 25): Slightly more sensitive to picking up voice so it doesn't think you stopped.
-            if (vol > 20) { 
-                speechSeen = true; 
-                speechDetectedRef.current = true;
+            // Increased threshold to 30 to avoid picking up background noise
+            // Require at least 300ms of continuous speech before marking as valid
+            if (vol > 30) { 
+                speechDurationMs += 16;
+                if (speechDurationMs > 300) { // Only mark as speech after 300ms
+                    speechSeen = true; 
+                    speechDetectedRef.current = true;
+                }
                 silenceMs = 0; 
-            } else if (speechSeen) {
-                // 16ms per frame approx (60fps)
-                silenceMs += 16;
+            } else {
+                speechDurationMs = 0; // Reset speech duration on silence
+                if (speechSeen) {
+                    // 16ms per frame approx (60fps)
+                    silenceMs += 16;
+                }
             }
 
             // 3. SILENCE TIMEOUT INCREASED: 1.5s -> 3.5s
@@ -295,8 +314,8 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
                 vadCtx.close();
                 stopInterruptVAD();
                 
-                setStatus('listening'); 
-                startRecordingRef.current(); 
+                // Removed auto-start recording - manual only
+                setStatus('idle'); 
                 return;
             }
             interruptVadRafRef.current = requestAnimationFrame(loop);
@@ -309,7 +328,7 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
         socketRef.current?.close();
         if (vadRafRef.current) cancelAnimationFrame(vadRafRef.current);
         stopInterruptVAD();
-        stopWakeWordListener();
+        // Removed stopWakeWordListener
         if (playerRef.current) { 
             try { 
                 if (typeof playerRef.current.destroy === 'function') playerRef.current.destroy(); 
@@ -323,22 +342,41 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
     const connect = useCallback(async () => {
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) return;
 
-        initAudio(24000); 
-        await initMic();
+        console.log("Initializing audio...");
+        initAudio(24000);
 
         const wsUrl = apiEndpoint.replace(/^http/, 'ws').replace(/\/$/, '') + '/ws/voice';
+        console.log("Connecting to WebSocket:", wsUrl);
+        
         const ws = new WebSocket(wsUrl);
         socketRef.current = ws;
         ws.binaryType = 'arraybuffer';
 
         ws.onopen = () => {
-            console.log("WebSocket connected.");
-            ws.send(JSON.stringify({ type: 'start', session_id: sessionIdRef.current, filename: 'mic.webm' }));
+            console.log("WebSocket connected successfully!");
+            // Detect supported audio format for Safari iOS compatibility
+            let filename = 'mic.webm';
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                    filename = 'mic.mp4';
+                } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+                    filename = 'mic.wav';
+                }
+            }
+            console.log("Using audio format:", filename);
+            ws.send(JSON.stringify({ type: 'start', session_id: sessionIdRef.current, filename }));
             setStatus('idle');
         };
 
-        ws.onclose = () => setStatus('disconnected');
-        ws.onerror = (err) => { console.error(err); setStatus('disconnected'); };
+        ws.onclose = (event) => {
+            console.log("WebSocket closed:", event.code, event.reason);
+            setStatus('disconnected');
+        };
+        
+        ws.onerror = (err) => {
+            console.error("WebSocket error:", err);
+            setStatus('disconnected');
+        };
 
         ws.onmessage = (e) => {
             if (typeof e.data === 'string') {
@@ -382,7 +420,9 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
         };
     }, [apiEndpoint, initAudio, initMic, isPersistent]);
 
-    // --- Persistence Effect ---
+    // --- Persistence Effect (DISABLED) ---
+    // Wake word listener and auto-start removed - manual mic click only
+    /*
     useEffect(() => {
         if (isPersistent && status === 'idle') {
             startWakeWordListener();
@@ -390,6 +430,7 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
             stopWakeWordListener();
         }
     }, [isPersistent, status, startWakeWordListener, stopWakeWordListener]);
+    */
 
     useEffect(() => { return () => disconnect(); }, [disconnect]);
 
