@@ -9,6 +9,7 @@ export default function App() {
   const {
     status,
     messages,
+    tasks,
     connect,
     disconnect,
     clearMessages,
@@ -29,11 +30,13 @@ export default function App() {
     // This prevents the "jump" when the mobile address bar collapses
     <div className="h-[100dvh] w-full bg-[#FAF9F6] text-stone-800 font-serif flex justify-center overflow-hidden supports-[height:100cqh]:h-[100cqh]">
       <Chat 
-        messages={messages} 
+        messages={messages}
+        tasks={tasks}
         onClear={clearMessages} 
         onSendMessage={sendTextMessage} 
         isConnected={status !== 'disconnected'}
         isListening={status === 'listening'}
+        isProcessing={status === 'processing'}
         onStartRecording={startRecording}
         onStopRecording={stopRecording}
       />

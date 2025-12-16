@@ -29,3 +29,26 @@ body {
 .animate-text-reveal {
     animation: text-reveal var(--text-reveal-duration, 0.8s) ease-out forwards;
 }
+
+/* Word wrapping and overflow handling for chat messages */
+.markdown-content {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 100%;
+}
+
+.markdown-content a {
+    word-break: break-all;
+    overflow-wrap: anywhere;
+}
+
+.markdown-content pre {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.markdown-content code {
+    word-break: break-all;
+    white-space: pre-wrap;
+}

@@ -1,31 +1,33 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Check, ChevronDown, ArrowUp, Zap, Mic, Paperclip } from 'lucide-react';
+import { Copy, Check, ChevronDown, ChevronRight, ArrowUp, Zap, Mic, Paperclip } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import type { Message } from '../hooks/useJarvis';
+import type { Message, Task } from '../hooks/useJarvis';
 import Spinner from './Spinner';
-// --- CHANGE 1: Import the new component ---
-import GeometricCore from './GeometricCore'; 
+import GeometricCore from './GeometricCore';
+import TaskQueue from './TaskQueue';
 
 interface ChatProps {
-  // ... (props remain the same)
   messages: Message[];
+  tasks?: Task[];
   onClear?: () => void;
   onSendMessage?: (message: string) => void;
   isConnected?: boolean;
   isListening?: boolean;
+  isProcessing?: boolean;
   onStartRecording?: () => void;
   onStopRecording?: () => void;
 }
 
 export default function Chat({
-    // ... (destructuring remains the same)
   messages,
+  tasks = [],
   onSendMessage,
   isConnected = true,
   isListening = false,
+  isProcessing = false,
   onStartRecording,
   onStopRecording
 }: ChatProps) {
@@ -35,6 +37,7 @@ export default function Chat({
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [input, setInput] = useState('');
   const [expandedThoughts, setExpandedThoughts] = useState<Set<string>>(new Set());
+  const [expandedCodeBlocks, setExpandedCodeBlocks] = useState<Set<string>>(new Set());
 
   const handleToggleThought = (msgId: string) => {
       setExpandedThoughts(prev => {
@@ -45,9 +48,18 @@ export default function Chat({
       });
   };
 
+  const handleToggleCodeBlock = (blockId: string) => {
+      setExpandedCodeBlocks(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(blockId)) newSet.delete(blockId);
+          else newSet.add(blockId);
+          return newSet;
+      });
+  };
+
   useEffect(() => {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isProcessing]);
 
   useEffect(() => {
       if (textareaRef.current) {
@@ -84,19 +96,16 @@ export default function Chat({
   return (
     <div className="flex flex-col h-full w-full max-w-3xl mx-auto relative bg-[#FAF9F6]">
       
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 pt-6 pb-4 scroll-smooth custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 pt-6 pb-4 scroll-smooth no-scrollbar">
         
-        {/* --- EMPTY STATE WITH NEW 3D GEOMETRY --- */}
-        {messages.length === 0 && (
+        {/* Empty State */}
+        {messages.length === 0 && !isProcessing && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ scale: 0.95 }}
+            animate={{ scale: 1 }}
             transition={{ duration: 0.6 }}
             className="h-full flex flex-col items-center justify-center -mt-20 relative z-10"
           >
-            {/* CHANGE 2: Increased size and used the new component.
-               Added overflow-visible so the stars/glow don't get clipped too harshly.
-            */}
             <div className="w-64 h-64 mb-4 relative overflow-visible">
                <GeometricCore isConnected={isConnected} />
             </div>
@@ -110,10 +119,9 @@ export default function Chat({
           </motion.div>
         )}
 
-        {/* ... The rest of the Chat component (messages loop, input area) remains exactly the same ... */}
+        {/* Messages */}
         <AnimatePresence initial={false} mode='popLayout'>
           {messages.map((msg, index) => {
-            // ... (truncated for brevity, no changes needed here)
              const isUser = msg.source === 'user';
              let thinkingContent: string | null = null;
              let mainContent = msg.text;
@@ -134,8 +142,9 @@ export default function Chat({
                <motion.div
                  key={msg.id}
                  layout
-                 initial={{ opacity: 0, y: 10 }}
-                 animate={{ opacity: 1, y: 0 }}
+                 initial={{ x: -20 }}
+                 animate={{ x: 0 }}
+                 transition={{ duration: 0.3, ease: "easeOut" }}
                  className={`flex w-full mb-8 ${isUser ? 'justify-end' : 'justify-start'}`}
                >
                  <div className={`flex flex-col ${isUser ? 'items-end max-w-[85%]' : 'items-start w-full'}`}>
@@ -146,6 +155,11 @@ export default function Chat({
                      </div>
                    ) : (
                      <div className="w-full space-y-2">
+                       {/* Show task queue if this message has tasks */}
+                       {msg.tasks && msg.tasks.length > 0 && (
+                         <TaskQueue tasks={msg.tasks} />
+                       )}
+                       
                        {thinkingContent && (
                          <div className="mb-4">
                            <button
@@ -183,7 +197,7 @@ export default function Chat({
                          </div>
                        )}
  
-                       <div className="text-[16px] leading-7 text-[#1a1a1a] font-serif markdown-content">
+                       <div className="text-[16px] leading-7 text-[#1a1a1a] font-serif markdown-content break-words overflow-wrap-anywhere">
                          {mainContent && (
                            <ReactMarkdown
                              remarkPlugins={[remarkMath]}
@@ -194,10 +208,25 @@ export default function Chat({
                                  const codeString = String(children).replace(/\n$/, '');
                                  const isBlock = !inline && match;
                                  
+                                 const blockId = `${msg.id}-code-${index}`;
+                                 const isExpanded = expandedCodeBlocks.has(blockId);
+                                 
                                  return isBlock ? (
-                                   <div className="my-6 rounded-lg overflow-hidden border border-stone-200 bg-[#1e1e1e] shadow-sm">
+                                   <motion.div
+                                     initial={{ y: 5 }}
+                                     animate={{ y: 0 }}
+                                     transition={{ duration: 0.2 }}
+                                     className="my-6 rounded-lg overflow-hidden border border-stone-200 bg-[#1e1e1e] shadow-sm"
+                                   >
                                      <div className="flex items-center justify-between px-3 py-1.5 bg-[#2d2d2d] border-b border-white/5">
-                                       <span className="text-xs text-stone-400 font-sans lowercase">{match[1]}</span>
+                                       <button
+                                         onClick={() => handleToggleCodeBlock(blockId)}
+                                         className="flex items-center gap-2 text-xs text-stone-400 hover:text-white transition-colors"
+                                       >
+                                         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                         <span className="font-sans lowercase">{match[1]}</span>
+                                         <span className="text-stone-500">({codeString.split('\n').length} lines)</span>
+                                       </button>
                                        <button
                                          onClick={() => handleCopy(codeString, index)}
                                          className="flex items-center gap-1 text-xs text-stone-400 hover:text-white transition-colors"
@@ -206,17 +235,19 @@ export default function Chat({
                                          <span>{copiedIndex === index ? 'Copied' : 'Copy'}</span>
                                        </button>
                                      </div>
-                                     <pre className="p-4 overflow-x-auto text-sm font-mono text-[#d4d4d4] leading-relaxed custom-scrollbar">
-                                       <code>{children}</code>
-                                     </pre>
-                                   </div>
+                                     {isExpanded && (
+                                       <pre className="p-4 overflow-x-auto text-sm font-mono text-[#d4d4d4] leading-relaxed custom-scrollbar break-all">
+                                         <code className="whitespace-pre-wrap break-words">{codeString}</code>
+                                       </pre>
+                                     )}
+                                   </motion.div>
                                  ) : (
                                    <code className="bg-stone-100 text-[#D95757] px-1 py-0.5 rounded text-[0.9em] font-mono font-medium">
                                      {children}
                                    </code>
                                  );
                                },
-                               p: ({ node, ...props }) => <p className="mb-4 last:mb-0" {...props} />,
+                               p: ({ node, ...props }) => <p className="mb-4 last:mb-0 break-words" {...props} />,
                                ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4 space-y-1" {...props} />,
                                ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-4 space-y-1" {...props} />,
                                blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-orange-200 pl-4 italic text-stone-600 my-4" {...props} />,
@@ -233,6 +264,24 @@ export default function Chat({
              );
           })}
         </AnimatePresence>
+
+        {isProcessing && (
+          <motion.div
+            initial={{ y: 10 }}
+            animate={{ y: 0 }}
+            className="flex w-full mb-8 justify-start"
+          >
+            <div className="flex flex-col items-start w-full">
+              <div className="w-full space-y-2">
+                <div className="text-[16px] leading-7 text-[#1a1a1a] font-serif markdown-content">
+                  <div className="bg-white px-5 py-3 rounded-2xl">
+                    <Spinner />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
         
         <div ref={bottomRef} className="h-4" />
       </div>
@@ -252,8 +301,8 @@ export default function Chat({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={!isConnected || isListening}
-              placeholder={isListening ? "Listening..." : "How can I help you?"}
+              disabled={!isConnected || isListening || isProcessing}
+              placeholder={isListening ? "Listening..." : (isProcessing ? "Jarvis is thinking..." : "How can I help you?")}
               className="w-full max-h-[300px] py-4 px-4 bg-transparent border-none resize-none text-[16px] text-[#1a1a1a] placeholder:text-stone-400 focus:ring-0 focus:outline-none font-serif leading-relaxed custom-scrollbar"
               rows={1}
             />
@@ -267,6 +316,7 @@ export default function Chat({
                    <button
                     type="button"
                     onClick={isListening ? onStopRecording : onStartRecording}
+                    disabled={isProcessing}
                     className={`p-2 rounded-lg transition-all ${
                       isListening ? 'text-red-500 bg-red-50' : 'text-stone-400 hover:bg-stone-100 hover:text-stone-600'
                     }`}
@@ -282,11 +332,11 @@ export default function Chat({
                  </span>
                  <button
                   onClick={handleFormSubmit}
-                  disabled={!input.trim() || !isConnected || isListening}
+                  disabled={!input.trim() || !isConnected || isListening || isProcessing}
                   className={`
                     p-2 rounded-lg transition-all duration-200 flex items-center justify-center
                     ${input.trim() && isConnected 
-                      ? 'bg-[#DA7756] text-white shadow-sm hover:bg-[#c96645]'
+                      ? 'bg-[#0F9D58] text-white shadow-sm hover:bg-[#0F9D58]/60'
                       : 'bg-stone-100 text-stone-300 cursor-not-allowed'}
                   `}
                 >

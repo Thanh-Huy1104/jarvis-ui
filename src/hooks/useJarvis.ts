@@ -3,7 +3,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import PCMPlayer from 'pcm-player';
 
 // --- Types ---
-export type EveStatus =
+export type JarvisStatus =
   | 'disconnected'
   | 'idle'
   | 'listening'
@@ -14,11 +14,19 @@ export interface Message {
   id: string;
   source: 'user' | 'assistant';
   text: string;
+  tasks?: Task[];  // Attach tasks to messages for persistence
+}
+
+export interface Task {
+  id: string;
+  description: string;
+  status: 'queued' | 'running' | 'complete' | 'failed';
 }
 
 export function useJarvis(apiEndpoint: string, isPersistent = false) {
     const [status, setStatus] = useState<JarvisStatus>('disconnected');
     const [messages, setMessages] = useState<Message[]>([]);
+    const [tasks, setTasks] = useState<Task[]>([]);
     const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
 
     // Refs for state
@@ -402,13 +410,50 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
                             setMessages(prev => prev.map(m => m.id === streamingIdRef.current ? { ...m, text: m.text + msg.text } : m));
                         }
                         break;
+                    case 'task_queue':
+                        // Attach tasks to current streaming message AND set in state for live updates
+                        setTasks(msg.tasks || []);
+                        if (streamingIdRef.current) {
+                            setMessages(prev => prev.map(m => 
+                                m.id === streamingIdRef.current 
+                                    ? { ...m, tasks: msg.tasks || [] }
+                                    : m
+                            ));
+                        }
+                        break;
+                    case 'task_update':
+                        // Update individual task status in both state and message
+                        if (msg.task_id) {
+                            setTasks(prev => prev.map(t => 
+                                t.id === msg.task_id 
+                                    ? { ...t, status: msg.status }
+                                    : t
+                            ));
+                            if (streamingIdRef.current) {
+                                setMessages(prev => prev.map(m => 
+                                    m.id === streamingIdRef.current && m.tasks
+                                        ? { 
+                                            ...m, 
+                                            tasks: m.tasks.map(t => 
+                                                t.id === msg.task_id 
+                                                    ? { ...t, status: msg.status }
+                                                    : t
+                                            )
+                                          }
+                                        : m
+                                ));
+                            }
+                        }
+                        break;
                     case 'done':
                         stopInterruptVAD();
                          if (streamingIdRef.current) {
                             setMessages(prev => prev.map(m => m.id === streamingIdRef.current ? { ...m, text: msg.assistant_text } : m));
                             streamingIdRef.current = null;
                         }
-                        setStatus('idle'); 
+                        setStatus('idle');
+                        // Don't clear tasks - they're now part of the message
+                        setTasks([]);
                         break;
                 }
             } else if (e.data instanceof ArrayBuffer) {
@@ -449,5 +494,5 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
         }
     };
 
-    return { status, messages, analyserNode, connect, disconnect, startRecording, stopRecording, clearMessages, cancelRecording, sendTextMessage };
+    return { status, messages, tasks, analyserNode, connect, disconnect, startRecording, stopRecording, clearMessages, cancelRecording, sendTextMessage };
 }
