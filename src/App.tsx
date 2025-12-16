@@ -37,6 +37,7 @@ export default function App() {
         isConnected={status !== 'disconnected'}
         isListening={status === 'listening'}
         isProcessing={status === 'processing'}
+        isSpeaking={status === 'speaking'}
         onStartRecording={startRecording}
         onStopRecording={stopRecording}
       />

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-// @ts-ignore - pcm-player doesn't always have types available
+// @ts-expect-error - pcm-player doesn't always have types available
 import PCMPlayer from 'pcm-player';
 
 // --- Types ---
@@ -34,15 +34,19 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
     const isPersistentRef = useRef(isPersistent);
 
     const socketRef = useRef<WebSocket | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const playerRef = useRef<any>(null); 
     const recorderRef = useRef<MediaRecorder | null>(null);
     const vadRafRef = useRef<number | null>(null);
     const interruptVadRafRef = useRef<number | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const wakeWordRecognitionRef = useRef<any>(null);
     
     const streamingIdRef = useRef<string | null>(null); 
     
-    const sessionIdRef = useRef<string>(`jarvis-session-${Date.now()}`);
+    const sessionIdRef = useRef<string | null>(null);
+    // Lazy init in effect/callback to avoid purity issues
+
     const micStreamRef = useRef<MediaStream | null>(null);
     const isMicInitialized = useRef(false);
     const speechDetectedRef = useRef(false);
@@ -64,7 +68,9 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
                 if (typeof playerRef.current.destroy === 'function') {
                     playerRef.current.destroy();
                 }
-            } catch (e) { console.warn(e); }
+            } catch { 
+                // ignore
+            }
             playerRef.current = null;
         }
 
@@ -84,7 +90,9 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
         if (player.audioCtx) {
             const ctx = player.audioCtx as AudioContext;
             if (player.gainNode && player.gainNode.gain) {
-                 try { player.gainNode.gain.value = 3.0; } catch(e) {}
+                 try { player.gainNode.gain.value = 3.0; } catch { 
+                     // ignore
+                 }
             }
 
             if (player.gainNode) {
@@ -120,8 +128,6 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
 
     // --- Helper Functions ---
     const startRecording = useCallback(async () => {
-        // Removed wake word listener
-
         if (!isMicInitialized.current) {
             await initMic();
             if (!isMicInitialized.current) return;
@@ -137,7 +143,7 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
         speechDetectedRef.current = false;
         stream.getAudioTracks().forEach(t => t.enabled = true);
         
-        // Safari iOS compatibility: Use mp4 if webm not supported
+        // Safari iOS compatibility
         let mimeType = 'audio/webm';
         if (!MediaRecorder.isTypeSupported('audio/webm')) {
             if (MediaRecorder.isTypeSupported('audio/mp4')) {
@@ -167,7 +173,6 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
         recorderRef.current = recorder;
         recorder.start();
         setStatus('listening');
-        // VAD removed - manual stop only
     }, [initMic]);
 
     useEffect(() => {
@@ -182,114 +187,7 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
         }
     };
 
-    // --- Wake Word Logic ---
-    const startWakeWordListener = useCallback(() => {
-        const SpeechRecognition = window.webkitSpeechRecognition || (window as any).SpeechRecognition;
-        if (!SpeechRecognition) return;
-        if (wakeWordRecognitionRef.current) return;
-
-        console.log("Listening for 'Jarvis'...");
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognition.onresult = (event: any) => {
-            const results = event.results;
-            const transcript = results[results.length - 1][0].transcript.toLowerCase().trim();
-            if (transcript.includes("jarvis") || transcript.includes("hey jarvis")) {
-                console.log("Wake word detected: Jarvis");
-                recognition.stop();
-                wakeWordRecognitionRef.current = null;
-                startRecordingRef.current(); 
-            }
-        };
-
-        recognition.onerror = () => { wakeWordRecognitionRef.current = null; };
-        recognition.onend = () => {
-             wakeWordRecognitionRef.current = null;
-             if (statusRef.current === 'idle' && isPersistentRef.current) {
-                 try { recognition.start(); wakeWordRecognitionRef.current = recognition; } catch(e) {}
-             }
-        };
-
-        try {
-            recognition.start();
-            wakeWordRecognitionRef.current = recognition;
-        } catch (e) {
-            console.error("Wake word start error:", e);
-        }
-    }, []); 
-
-    const stopWakeWordListener = useCallback(() => {
-        if (wakeWordRecognitionRef.current) {
-            console.log("Stopping Wake Word Listener");
-            wakeWordRecognitionRef.current.stop();
-            wakeWordRecognitionRef.current = null;
-        }
-    }, []);
-
-    // --- VAD Logic (UPDATED) ---
-    const monitorVAD = (stream: MediaStream, recorder: MediaRecorder) => {
-        const vadCtx = new AudioContext();
-        const source = vadCtx.createMediaStreamSource(stream);
-        const analyser = vadCtx.createAnalyser();
-        analyser.fftSize = 512;
-        source.connect(analyser);
-        const buffer = new Uint8Array(analyser.frequencyBinCount);
-        let speechSeen = false;
-        let silenceMs = 0;
-        let speechDurationMs = 0; // Track how long speech has been detected
-        const startTime = Date.now();
-
-        const loop = () => {
-            if (recorder.state !== 'recording') { vadCtx.close(); return; }
-            
-            // 1. MAX DURATION INCREASED: 8s -> 60s
-            // This prevents it from cutting you off mid-sentence aggressively.
-            if (Date.now() - startTime > 30000) { 
-                console.log("Max duration reached (30s). Stopping.");
-                stopRecording();
-                cancelAnimationFrame(vadRafRef.current!);
-                vadCtx.close();
-                return;
-            }
-
-            analyser.getByteFrequencyData(buffer);
-            const relevantBins = buffer.subarray(4); 
-            const vol = relevantBins.reduce((a, b) => a + b, 0) / relevantBins.length;
-
-            // 2. SENSITIVITY ADJUSTMENT
-            // Increased threshold to 30 to avoid picking up background noise
-            // Require at least 300ms of continuous speech before marking as valid
-            if (vol > 30) { 
-                speechDurationMs += 16;
-                if (speechDurationMs > 300) { // Only mark as speech after 300ms
-                    speechSeen = true; 
-                    speechDetectedRef.current = true;
-                }
-                silenceMs = 0; 
-            } else {
-                speechDurationMs = 0; // Reset speech duration on silence
-                if (speechSeen) {
-                    // 16ms per frame approx (60fps)
-                    silenceMs += 16;
-                }
-            }
-
-            // 3. SILENCE TIMEOUT INCREASED: 1.5s -> 3.5s
-            // Waits for 3.5 seconds of silence before sending.
-            if (speechSeen && silenceMs > 2500) {
-                console.log("Silence detected (2.5s). Stopping.");
-                stopRecording();
-                cancelAnimationFrame(vadRafRef.current!);
-                vadCtx.close();
-            } else {
-                vadRafRef.current = requestAnimationFrame(loop);
-            }
-        };
-        loop();
-    };
+    const stopInterruptVAD = () => { if (interruptVadRafRef.current) { cancelAnimationFrame(interruptVadRafRef.current); interruptVadRafRef.current = null; } };
 
     const startInterruptVAD = useCallback(async () => {
         if (!micStreamRef.current) return;
@@ -315,7 +213,9 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
                 if (playerRef.current) {
                     try { 
                         if (typeof playerRef.current.destroy === 'function') playerRef.current.destroy(); 
-                    } catch(e) {}
+                    } catch { 
+                        // ignore
+                    }
                     playerRef.current = null;
                 }
                 socketRef.current?.send(JSON.stringify({ type: 'interrupt' }));
@@ -331,16 +231,16 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
         loop();
     }, []);
 
-    const stopInterruptVAD = () => { if (interruptVadRafRef.current) { cancelAnimationFrame(interruptVadRafRef.current); interruptVadRafRef.current = null; } };
     const disconnect = useCallback(() => {
         socketRef.current?.close();
         if (vadRafRef.current) cancelAnimationFrame(vadRafRef.current);
         stopInterruptVAD();
-        // Removed stopWakeWordListener
         if (playerRef.current) { 
             try { 
                 if (typeof playerRef.current.destroy === 'function') playerRef.current.destroy(); 
-            } catch(e) {} 
+            } catch { 
+                // ignore
+            } 
             playerRef.current = null; 
         }
         setStatus('disconnected');
@@ -352,6 +252,11 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
 
         console.log("Initializing audio...");
         initAudio(24000);
+
+        // Lazy init session ID
+        if (!sessionIdRef.current) {
+            sessionIdRef.current = `jarvis-session-${Date.now()}`;
+        }
 
         const wsUrl = apiEndpoint.replace(/^http/, 'ws').replace(/\/$/, '') + '/ws/voice';
         console.log("Connecting to WebSocket:", wsUrl);
@@ -390,27 +295,31 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
             if (typeof e.data === 'string') {
                 const msg = JSON.parse(e.data);
                 switch(msg.type) {
-                    case 'audio_format':
+                    case 'audio_format': {
                         if (msg.sample_rate && (msg.sample_rate !== currentSampleRate.current || !playerRef.current)) {
                             initAudio(msg.sample_rate);
                         }
                         break;
-                    case 'transcript':
+                    }
+                    case 'transcript': {
                         setMessages(prev => [...prev, { id: `${sessionIdRef.current}-${Date.now()}`, source: 'user', text: msg.text }]);
                         break;
-                    case 'assistant_start':
+                    }
+                    case 'assistant_start': {
                         setStatus('speaking');
                         const newStreamingId = `${sessionIdRef.current}-${Date.now()}`;
                         streamingIdRef.current = newStreamingId; 
                         setMessages(prev => [...prev, { id: newStreamingId, source: 'assistant', text: '' }]);
                         startInterruptVAD();
                         break;
-                    case 'token':
+                    }
+                    case 'token': {
                         if (streamingIdRef.current) {
                             setMessages(prev => prev.map(m => m.id === streamingIdRef.current ? { ...m, text: m.text + msg.text } : m));
                         }
                         break;
-                    case 'task_queue':
+                    }
+                    case 'task_queue': {
                         // Attach tasks to current streaming message AND set in state for live updates
                         setTasks(msg.tasks || []);
                         if (streamingIdRef.current) {
@@ -421,7 +330,8 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
                             ));
                         }
                         break;
-                    case 'task_update':
+                    }
+                    case 'task_update': {
                         // Update individual task status in both state and message
                         if (msg.task_id) {
                             setTasks(prev => prev.map(t => 
@@ -445,7 +355,8 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
                             }
                         }
                         break;
-                    case 'done':
+                    }
+                    case 'done': {
                         stopInterruptVAD();
                          if (streamingIdRef.current) {
                             setMessages(prev => prev.map(m => m.id === streamingIdRef.current ? { ...m, text: msg.assistant_text } : m));
@@ -455,6 +366,7 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
                         // Don't clear tasks - they're now part of the message
                         setTasks([]);
                         break;
+                    }
                 }
             } else if (e.data instanceof ArrayBuffer) {
                 if (!playerRef.current) {
@@ -463,19 +375,7 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
                 playerRef.current?.feed(e.data);
             }
         };
-    }, [apiEndpoint, initAudio, initMic, isPersistent]);
-
-    // --- Persistence Effect (DISABLED) ---
-    // Wake word listener and auto-start removed - manual mic click only
-    /*
-    useEffect(() => {
-        if (isPersistent && status === 'idle') {
-            startWakeWordListener();
-        } else {
-            stopWakeWordListener();
-        }
-    }, [isPersistent, status, startWakeWordListener, stopWakeWordListener]);
-    */
+    }, [apiEndpoint, initAudio, initMic, isPersistent, startInterruptVAD]);
 
     useEffect(() => { return () => disconnect(); }, [disconnect]);
 
