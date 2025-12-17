@@ -106,7 +106,7 @@ export default function Chat({
   };
 
   return (
-    <div className="flex flex-col h-full w-full max-w-3xl mx-auto relative bg-[#FAF9F6]">
+    <div className="flex flex-col h-full w-full max-w-5xl mx-auto relative bg-[#FAF9F6]">
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 pt-6 pb-4 scroll-smooth no-scrollbar">
 
