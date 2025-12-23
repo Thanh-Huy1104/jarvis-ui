@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-// @ts-expect-error - pcm-player doesn't always have types available
 import PCMPlayer from 'pcm-player';
 
 // --- Types ---
@@ -39,8 +38,6 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
     const recorderRef = useRef<MediaRecorder | null>(null);
     const vadRafRef = useRef<number | null>(null);
     const interruptVadRafRef = useRef<number | null>(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const wakeWordRecognitionRef = useRef<any>(null);
     
     const streamingIdRef = useRef<string | null>(null); 
     

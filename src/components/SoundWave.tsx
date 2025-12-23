@@ -92,7 +92,7 @@ interface SoundWaveProps {
 export default function SoundWave({ analyserNode, status }: SoundWaveProps) {
     return (
         <div className="w-full h-full min-h-[300px] bg-white rounded-3xl overflow-hidden relative flex items-center justify-center">
-            {status === 'thinking' && <Spinner />}
+            {status === 'processing' && <Spinner />}
             {status === 'listening' && (
                 <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
                     <color attach="background" args={['#ffffff']} />

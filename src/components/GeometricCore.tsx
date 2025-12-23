@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Center, Float, Text } from '@react-three/drei';
+import { Center, Float } from '@react-three/drei';
 import * as THREE from 'three';
 
 // Colors
@@ -13,7 +13,7 @@ function CentralCrystal({ isConnected }: { isConnected: boolean }) {
   const meshRef = useRef<THREE.Mesh>(null!);
   const materialRef = useRef<THREE.MeshPhysicalMaterial>(null!);
 
-  useFrame((state, delta) => {
+  useFrame((_state, delta) => {
     // 1. Slow, complex rotation for the crystal center
     meshRef.current.rotation.y += delta * 0.2;
     meshRef.current.rotation.z += delta * 0.1;
@@ -50,7 +50,7 @@ function OrbitingRings() {
   const ring1Ref = useRef<THREE.Group>(null!);
   const ring2Ref = useRef<THREE.Group>(null!);
 
-  useFrame((state, delta) => {
+  useFrame((_state, delta) => {
     // Rotate rings on different axes at different speeds
     ring1Ref.current.rotation.x += delta * 0.5;
     ring1Ref.current.rotation.y += delta * 0.2;

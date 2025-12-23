@@ -277,7 +277,7 @@ export default function Chat({
                               blockquote: ({ ...props }) => <blockquote className="border-l-4 border-orange-200 pl-4 italic text-stone-600 my-4" {...props} />,
                               hr: ({ ...props }) => <hr className="my-8 border-t border-stone-300" {...props} />,
                               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                              img: ({ node, ...props }: any) => (
+                              img: ({ ...props }: any) => (
                                 <img
                                   {...props}
                                   className="max-w-full h-auto rounded-lg shadow-sm border border-stone-200 my-4"
