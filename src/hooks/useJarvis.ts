@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import PCMPlayer from 'pcm-player';
+import { getSessionHistory } from '../services/sessions';
 
 // --- Types ---
 export type JarvisStatus =
@@ -22,7 +23,7 @@ export interface Task {
   status: 'queued' | 'running' | 'complete' | 'failed';
 }
 
-export function useJarvis(apiEndpoint: string, isPersistent = false) {
+export function useJarvis(apiEndpoint: string, isPersistent = false, sessionId?: string) {
     const [status, setStatus] = useState<JarvisStatus>('disconnected');
     const [messages, setMessages] = useState<Message[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -41,7 +42,7 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
     
     const streamingIdRef = useRef<string | null>(null); 
     
-    const sessionIdRef = useRef<string | null>(null);
+    const sessionIdRef = useRef<string | null>(sessionId || null);
     // Lazy init in effect/callback to avoid purity issues
 
     const micStreamRef = useRef<MediaStream | null>(null);
@@ -53,6 +54,42 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
     // Sync refs
     useEffect(() => { statusRef.current = status; }, [status]);
     useEffect(() => { isPersistentRef.current = isPersistent; }, [isPersistent]);
+
+    // Update sessionIdRef when prop changes
+    useEffect(() => {
+        if (sessionId && sessionId !== sessionIdRef.current) {
+            sessionIdRef.current = sessionId;
+            // Disconnect to force reconnect with new session ID
+            if (socketRef.current) {
+                socketRef.current.close();
+                socketRef.current = null;
+            }
+        }
+    }, [sessionId]);
+
+    // Load history when sessionId changes
+    useEffect(() => {
+        if (sessionId) {
+            setMessages([]); // Clear previous messages
+            getSessionHistory(apiEndpoint, sessionId)
+                .then((history) => {
+                    const mappedMessages: Message[] = history.map((msg) => ({
+                        id: msg.id.toString(),
+                        source: msg.role === 'user' ? 'user' : 'assistant',
+                        text: msg.content,
+                        // tasks: [] // History doesn't have tasks yet
+                    }));
+                    setMessages(mappedMessages);
+                })
+                .catch((err) => {
+                    console.error("Failed to load session history:", err);
+                });
+        } else {
+             // New session or no ID
+             setMessages([]);
+        }
+    }, [sessionId, apiEndpoint]);
+
 
     const clearMessages = () => setMessages([]);
 
@@ -372,7 +409,7 @@ export function useJarvis(apiEndpoint: string, isPersistent = false) {
                 playerRef.current?.feed(e.data);
             }
         };
-    }, [apiEndpoint, initAudio, initMic, isPersistent, startInterruptVAD]);
+    }, [apiEndpoint, initAudio, initMic, isPersistent, startInterruptVAD, sessionId]); // Added sessionId dependency
 
     useEffect(() => { return () => disconnect(); }, [disconnect]);
 

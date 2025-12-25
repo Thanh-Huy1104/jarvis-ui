@@ -1,18 +1,23 @@
 import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useLocation, useMatch } from 'react-router-dom';
 import ChatPage from './pages/ChatPage';
 import SkillsPage from './pages/SkillsPage';
+import SkillsLibraryPage from './pages/SkillsLibraryPage';
 import SandboxPage from './pages/SandboxPage';
-import { MessageSquare, Library, Command, Settings, PanelLeftClose, PanelLeftOpen, FlaskConical } from 'lucide-react';
+import { MessageSquare, Library, Command, Settings, PanelLeftClose, PanelLeftOpen, FlaskConical, GitPullRequest } from 'lucide-react';
 import { ToastProvider } from './components/Toast';
+import SessionList from './components/SessionList';
 
-function Sidebar() {
+function Sidebar({ apiEndpoint }: { apiEndpoint: string }) {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const match = useMatch('/c/:sessionId');
+  const currentSessionId = match?.params.sessionId;
 
   const navItems = [
     { path: '/', icon: MessageSquare, label: 'Chat' },
-    { path: '/skills', icon: Library, label: 'Skills' },
+    { path: '/skills', icon: GitPullRequest, label: 'Pending Skills' },
+    { path: '/library', icon: Library, label: 'Skills Library' },
     { path: '/sandbox', icon: FlaskConical, label: 'Sandbox' },
   ];
 
@@ -47,7 +52,7 @@ function Sidebar() {
       </div>
 
       {/* Navigation Links */}
-      <nav className="flex-1 px-3 space-y-1">
+      <nav className="flex-shrink-0 px-3 space-y-1">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
@@ -83,8 +88,17 @@ function Sidebar() {
         })}
       </nav>
 
+      {/* Sessions List */}
+      <div className="flex-1 overflow-hidden flex flex-col mt-2 border-t border-stone-200/50 pt-2">
+         <SessionList 
+            apiEndpoint={apiEndpoint} 
+            isCollapsed={isCollapsed} 
+            currentSessionId={currentSessionId}
+         />
+      </div>
+
       {/* Footer */}
-      <div className="p-3 mt-auto space-y-2">
+      <div className="p-3 mt-auto space-y-2 flex-shrink-0">
          {/* Settings Button */}
         <button 
             className={`
@@ -101,10 +115,10 @@ function Sidebar() {
   );
 }
 
-function Layout({ children }: { children: React.ReactNode }) {
+function Layout({ children, apiEndpoint }: { children: React.ReactNode, apiEndpoint: string }) {
   return (
     <div className="flex h-[100dvh] w-full bg-[#FAF9F6] text-stone-800 font-serif overflow-hidden supports-[height:100cqh]:h-[100cqh] selection:bg-[#34A853]/20 selection:text-[#1a1a1a]">
-      <Sidebar />
+      <Sidebar apiEndpoint={apiEndpoint} />
       {/* Main Content Area */}
       <main className="flex-1 h-full w-full relative overflow-hidden flex flex-col">
         {children}
@@ -119,10 +133,12 @@ export default function App() {
   return (
     <ToastProvider>
         <BrowserRouter>
-        <Layout>
+        <Layout apiEndpoint={apiEndpoint}>
             <Routes>
             <Route path="/" element={<ChatPage apiEndpoint={apiEndpoint} />} />
+            <Route path="/c/:sessionId" element={<ChatPage apiEndpoint={apiEndpoint} />} />
             <Route path="/skills" element={<SkillsPage apiEndpoint={apiEndpoint} />} />
+            <Route path="/library" element={<SkillsLibraryPage apiEndpoint={apiEndpoint} />} />
             <Route path="/sandbox" element={<SandboxPage apiEndpoint={apiEndpoint} />} />
             </Routes>
         </Layout>

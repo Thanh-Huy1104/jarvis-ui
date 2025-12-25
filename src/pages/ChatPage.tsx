@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useJarvis } from '../hooks/useJarvis';
 import Chat from '../components/Chat';
 
@@ -8,6 +9,7 @@ interface ChatPageProps {
 
 export default function ChatPage({ apiEndpoint }: ChatPageProps) {
   const [isPersistent] = useState(false);
+  const { sessionId } = useParams<{ sessionId: string }>();
 
   const {
     status,
@@ -19,7 +21,7 @@ export default function ChatPage({ apiEndpoint }: ChatPageProps) {
     sendTextMessage,
     startRecording,
     stopRecording
-  } = useJarvis(apiEndpoint, isPersistent);
+  } = useJarvis(apiEndpoint, isPersistent, sessionId);
 
   useEffect(() => {
     connect(); 

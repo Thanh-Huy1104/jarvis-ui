@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, CheckCircle2, AlertCircle, Loader2, XCircle, Play, X, Download } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Terminal, CheckCircle2, Loader2, XCircle, X } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface LogEvent {
   stage: string;    // PLANNING, TESTING, REFINING, COMPLETED, FAILED
