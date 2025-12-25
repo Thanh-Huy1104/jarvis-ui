@@ -3,10 +3,11 @@ import {
   Briefcase, Check, X, Wand2, Code, Sparkles, Send, Play, 
   Terminal, Save, AlertCircle, RefreshCw, ChevronRight, Box
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useToast } from '../components/Toast';
+import { SkillApprovalFlow } from '../components/SkillApprovalFlow';
 
 // --- Types ---
 interface PendingSkill {
@@ -39,6 +40,7 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
   const [isRefining, setIsRefining] = useState(false);
   const [testOutput, setTestOutput] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
   
   const { showToast } = useToast();
 
@@ -69,6 +71,7 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
       setTestOutput(null);
       setRefineInstruction('');
       setIsEditing(false);
+      setIsApproving(false);
     }
   }, [selectedSkill]);
 
@@ -100,24 +103,17 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
     }
   };
 
-  const handleApprove = async () => {
+  const handleApprove = () => {
     if (!selectedSkill) return;
-    try {
-      const res = await fetch(`${apiEndpoint}/skills/pending/${selectedSkill.id}/approve`, {
-        method: 'POST',
-      });
-      if (res.ok) {
+    setIsApproving(true);
+  };
+
+  const handleApprovalComplete = () => {
+    if (selectedSkill) {
         setSkills(prev => prev.filter(s => s.id !== selectedSkill.id));
         setSelectedSkill(null);
+        setIsApproving(false);
         showToast("Skill approved and saved to library", "success");
-      } else {
-        const data = await res.json();
-        setTestOutput(`Approval Failed:\n${data.error || 'Unknown error'}\n\nOutput:\n${data.output || ''}`);
-        showToast("Verification failed. Check output.", "error");
-      }
-    } catch (error) {
-      console.error("Error approving skill:", error);
-      showToast("Network error approving skill", "error");
     }
   };
 
@@ -171,12 +167,6 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
     setIsTesting(true);
     setTestOutput(null);
     try {
-      // We test the *edited* code if there are pending changes, or the saved code?
-      // Usually better to test the SAVED code to ensure consistency, 
-      // OR we send the code in the body. The current API might only run saved code.
-      // Let's assume we need to save first or the API runs saved code.
-      // If we want to test 'dirty' code, we'd need a different endpoint or update first.
-      // For safety/simplicity, let's warn if dirty, or auto-save.
       if (isEditing) {
           await handleSaveCode();
       }
@@ -202,7 +192,39 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
   };
 
   return (
-    <div className="h-full bg-[#FAF9F6] flex overflow-hidden">
+    <div className="h-full bg-[#FAF9F6] flex overflow-hidden relative">
+      
+      {/* --- Modal Overlay for Approval --- */}
+      <AnimatePresence>
+        {isApproving && selectedSkill && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-8 sm:p-12">
+                {/* Backdrop */}
+                <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                    onClick={() => setIsApproving(false)} // Click outside to close? Maybe safer to force button.
+                />
+                
+                {/* Modal Content */}
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                    className="relative w-full max-w-5xl h-full max-h-[800px] shadow-2xl rounded-xl overflow-hidden"
+                >
+                    <SkillApprovalFlow 
+                        skillId={selectedSkill.id}
+                        apiEndpoint={apiEndpoint}
+                        onComplete={handleApprovalComplete}
+                        onCancel={() => setIsApproving(false)}
+                    />
+                </motion.div>
+            </div>
+        )}
+      </AnimatePresence>
+
       {/* --- Sidebar: Skill List --- */}
       <div className="w-80 flex-shrink-0 border-r border-stone-200 bg-white flex flex-col z-10">
         <div className="p-6 border-b border-stone-100">
@@ -275,19 +297,18 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                  <button 
                     onClick={handleDelete}
-                    className="px-4 py-2 text-stone-500 hover:text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                    className="px-6 py-2.5 bg-white text-red-600 border border-red-100 hover:bg-red-50 hover:border-red-200 rounded-xl text-sm font-medium transition-all active:scale-95 flex items-center gap-2 shadow-sm"
                   >
-                    <X size={16} /> Reject
+                    <X size={18} /> Reject
                   </button>
-                  <div className="h-6 w-px bg-stone-200 mx-1" />
                   <button 
                     onClick={handleApprove}
-                    className="px-5 py-2 bg-[#1a1a1a] text-white hover:bg-black rounded-lg text-sm font-medium transition-all shadow-lg shadow-black/10 hover:shadow-xl flex items-center gap-2"
+                    className="px-6 py-2.5 bg-[#1a1a1a] text-white hover:bg-black rounded-xl text-sm font-medium transition-all shadow-lg shadow-black/10 hover:shadow-xl active:scale-95 flex items-center gap-2"
                   >
-                    <Check size={16} /> Approve & Save
+                    <Check size={18} /> Approve & Save
                   </button>
               </div>
             </div>
@@ -356,7 +377,7 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
 
                 {/* Right Pane: Tools & Context */}
                 <div className="w-full md:w-[400px] bg-white flex flex-col border-l border-stone-200">
-                    <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col gap-8">
                         
                         {/* Description */}
                         <div>
@@ -393,8 +414,8 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
                             </div>
                         </div>
 
-                        {/* Test & Output */}
-                        <div className="flex-1 flex flex-col min-h-0">
+                        {/* Test & Output (Standard - not for approval) */}
+                        <div className="flex-1 flex flex-col min-h-[300px]">
                             <div className="flex justify-between items-center mb-3">
                                 <h3 className="text-xs font-bold uppercase tracking-widest text-stone-400 flex items-center gap-2">
                                     <Terminal size={12} /> Sandbox Output

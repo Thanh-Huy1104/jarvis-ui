@@ -23,21 +23,27 @@ function Sidebar() {
         ${isCollapsed ? 'w-[72px]' : 'w-[260px]'}
       `}
     >
-      {/* Header / Logo */}
-      <div className={`p-4 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} mb-2`}>
-        {!isCollapsed && (
-          <div className="flex items-center gap-3 text-[#1a1a1a] overflow-hidden whitespace-nowrap">
+      {/* Header / Logo / Toggle */}
+      <div className={`p-4 flex items-center justify-between mb-2`}>
+        {/* Logo Section */}
+        <div className={`flex items-center gap-3 text-[#1a1a1a] overflow-hidden whitespace-nowrap transition-opacity duration-200 ${isCollapsed ? 'opacity-0 w-0' : 'opacity-100'}`}>
             <div className="w-8 h-8 bg-transparent border border-stone-200 rounded-lg flex items-center justify-center text-[#1a1a1a] shrink-0">
               <Command size={16} strokeWidth={2} />
             </div>
             <span className="font-serif text-xl font-medium tracking-tight">Jarvis</span>
-          </div>
-        )}
-        {isCollapsed && (
-             <div className="w-8 h-8 bg-transparent border border-stone-200 rounded-lg flex items-center justify-center text-[#1a1a1a] shrink-0">
-               <Command size={16} strokeWidth={2} />
-             </div>
-        )}
+        </div>
+
+        {/* Toggle Button (Icon Only) */}
+        <button 
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className={`
+                flex items-center justify-center w-8 h-8 rounded-lg text-stone-400 hover:bg-stone-200/50 hover:text-stone-700 transition-all
+                ${isCollapsed ? 'mx-auto' : ''}
+            `}
+            title={isCollapsed ? "Expand" : "Collapse"}
+        >
+            {isCollapsed ? <PanelLeftOpen size={18} strokeWidth={2} /> : <PanelLeftClose size={18} strokeWidth={2} />}
+        </button>
       </div>
 
       {/* Navigation Links */}
@@ -77,7 +83,7 @@ function Sidebar() {
         })}
       </nav>
 
-      {/* Footer / Toggle */}
+      {/* Footer */}
       <div className="p-3 mt-auto space-y-2">
          {/* Settings Button */}
         <button 
@@ -89,19 +95,6 @@ function Sidebar() {
         >
           <Settings size={20} strokeWidth={2} className="shrink-0" />
           {!isCollapsed && <span>Settings</span>}
-        </button>
-
-        {/* Collapse Toggle */}
-        <button 
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className={`
-                w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-stone-400 hover:bg-stone-200/30 hover:text-stone-700 transition-all text-[15px] font-sans
-                ${isCollapsed ? 'justify-center' : ''}
-            `}
-            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-        >
-            {isCollapsed ? <PanelLeftOpen size={20} strokeWidth={2} /> : <PanelLeftClose size={20} strokeWidth={2} />}
-            {!isCollapsed && <span>Collapse</span>}
         </button>
       </div>
     </aside>
