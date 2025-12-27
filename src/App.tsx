@@ -3,8 +3,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation, useMatch } from 'react
 import ChatPage from './pages/ChatPage';
 import SkillsPage from './pages/SkillsPage';
 import SkillsLibraryPage from './pages/SkillsLibraryPage';
-import SandboxPage from './pages/SandboxPage';
-import { MessageSquare, Library, Command, Settings, PanelLeftClose, PanelLeftOpen, FlaskConical, GitPullRequest } from 'lucide-react';
+import { MessageSquare, Library, Command, Settings, PanelLeftClose, PanelLeftOpen, GitPullRequest } from 'lucide-react';
 import { ToastProvider } from './components/Toast';
 import SessionList from './components/SessionList';
 
@@ -18,7 +17,6 @@ function Sidebar({ apiEndpoint }: { apiEndpoint: string }) {
     { path: '/', icon: MessageSquare, label: 'Chat' },
     { path: '/skills', icon: GitPullRequest, label: 'Pending Skills' },
     { path: '/library', icon: Library, label: 'Skills Library' },
-    { path: '/sandbox', icon: FlaskConical, label: 'Sandbox' },
   ];
 
   return (
@@ -139,7 +137,6 @@ export default function App() {
             <Route path="/c/:sessionId" element={<ChatPage apiEndpoint={apiEndpoint} />} />
             <Route path="/skills" element={<SkillsPage apiEndpoint={apiEndpoint} />} />
             <Route path="/library" element={<SkillsLibraryPage apiEndpoint={apiEndpoint} />} />
-            <Route path="/sandbox" element={<SandboxPage apiEndpoint={apiEndpoint} />} />
             </Routes>
         </Layout>
         </BrowserRouter>

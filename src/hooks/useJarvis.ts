@@ -292,7 +292,7 @@ export function useJarvis(apiEndpoint: string, isPersistent = false, sessionId?:
             sessionIdRef.current = `jarvis-session-${Date.now()}`;
         }
 
-        const wsUrl = apiEndpoint.replace(/^http/, 'ws').replace(/\/$/, '') + '/ws/voice';
+        const wsUrl = apiEndpoint.replace(/^http/, 'ws').replace(/\/$/, '') + '/ws/chat';
         console.log("Connecting to WebSocket:", wsUrl);
         
         const ws = new WebSocket(wsUrl);

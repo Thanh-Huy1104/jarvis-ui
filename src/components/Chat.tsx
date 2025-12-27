@@ -7,6 +7,7 @@ import rehypeKatex from 'rehype-katex';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { Message, Task } from '../hooks/useJarvis';
+import ToolCalls, { ToolCall } from './ToolCalls';
 import Spinner from './Spinner';
 import GeometricCore from './GeometricCore';
 import TaskQueue from './TaskQueue';
@@ -148,6 +149,25 @@ export default function Chat({
               }
             }
 
+            let toolCalls: ToolCall[] = [];
+            if (!isUser && mainContent) {
+              // Extract tool calls: {"tools": [...]}
+              const toolMatch = mainContent.match(/\{.*?"tools":\s*\[.*?\].*?\}/s);
+              if (toolMatch) {
+                try {
+                  const jsonStr = toolMatch[0];
+                  const parsed = JSON.parse(jsonStr);
+                  if (parsed.tools && Array.isArray(parsed.tools)) {
+                    toolCalls = parsed.tools;
+                    // Remove the tool call JSON from main content to avoid rendering raw JSON
+                    mainContent = mainContent.replace(jsonStr, '').trim();
+                  }
+                } catch (e) {
+                  console.error("Failed to parse tool calls:", e);
+                }
+              }
+            }
+
             if (mainContent) {
               mainContent = processMessageContent(mainContent);
             }
@@ -214,6 +234,11 @@ export default function Chat({
                             )}
                           </AnimatePresence>
                         </div>
+                      )}
+
+                      {/* Show tool calls if any */}
+                      {toolCalls.length > 0 && (
+                        <ToolCalls tools={toolCalls} />
                       )}
 
                       <div className="text-[16px] leading-7 text-[#1a1a1a] font-serif markdown-content break-words overflow-wrap-anywhere">
