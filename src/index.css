@@ -4,7 +4,12 @@
 
 /* You can add custom overrides below, but the line above is all you need */
 body {
-    background: #050508;
+    background: #FAF9F6;
+    color: #1a1a1a;
+}
+:root.dark body {
+    background: #1F1F1F;
+    color: #e5e5e5;
 }
 
 /* Custom utility to hide scrollbars */
