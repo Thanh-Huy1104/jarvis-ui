@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 /* You can add custom overrides below, but the line above is all you need */
 body {
     background: #050508;

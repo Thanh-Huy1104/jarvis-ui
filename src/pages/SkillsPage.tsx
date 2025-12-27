@@ -11,7 +11,6 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useToast } from '../components/Toast';
 import { SkillApprovalFlow } from '../components/SkillApprovalFlow';
 import Modal from '../components/Modal';
-import BackgroundGrid from '../components/BackgroundGrid';
 
 // --- Types ---
 interface PendingSkill {
@@ -31,10 +30,17 @@ interface SkillsPageProps {
 
 const parseSkillDescription = (content: string) => {
     if (!content) return '';
-    const match = content.match(/^---\s*[\s\S]*?---\s*([\s\S]*)$/);
-    if (match) {
-      return match[1].trim();
+    // Handle frontmatter
+    const frontmatterMatch = content.match(/^---\s*[\s\S]*?---\s*([\s\S]*)$/);
+    if (frontmatterMatch) {
+      return frontmatterMatch[1].trim();
     }
+    // Handle Python docstrings (triple quotes)
+    const docstringMatch = content.match(/"""([\s\S]*?)"""/);
+    if (docstringMatch) {
+      return docstringMatch[1].trim();
+    }
+    
     return content;
   };
 
@@ -47,9 +53,9 @@ const stripMarkdown = (markdown: string) => {
   text = text.replace(/(\*|_)(.*?)\1/g, '$2');
   // Remove code blocks
   text = text.replace(/```[\s\S]*?```/g, '');
-  text = text.replace(/`([^`]+)`/g, '$1');
+  text = text.replace(/`([^`]+)`/g, '');
   // Remove links
-  text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+  text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '');
   // Remove images
   text = text.replace(/!\[([^\]]*)\]\([^)]+\)/g, '');
   return text.trim();
@@ -222,28 +228,27 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
   };
 
   return (
-    <div className="h-full bg-[#FAF9F6] flex flex-col overflow-hidden relative">
-      <BackgroundGrid />
+    <div className="h-full bg-[#FAF9F6] dark:bg-[#1F1F1F] flex flex-col overflow-hidden relative">
       
       {/* --- Header --- */}
-      <div className="relative z-10 px-6 py-6 border-b border-stone-200/50 backdrop-blur-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
+      <div className="relative z-10 px-6 py-6 border-b border-stone-200/50 dark:border-white/5 backdrop-blur-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
          <div>
-            <h1 className="text-2xl font-serif font-medium text-[#1a1a1a] flex items-center gap-3">
-              <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                <GitPullRequest className="text-amber-600" size={24} strokeWidth={2} />
+            <h1 className="text-2xl font-serif font-medium text-[#1a1a1a] dark:text-stone-100 flex items-center gap-3">
+              <div className="p-2 bg-stone-100 dark:bg-[#2A2A2A] rounded-lg border border-stone-200 dark:border-white/10">
+                <GitPullRequest className="text-stone-600 dark:text-stone-300" size={24} strokeWidth={2} />
               </div>
               Pending Skills
             </h1>
-            <p className="text-sm text-stone-500 mt-1 pl-14">
+            <p className="text-sm text-stone-500 dark:text-stone-400 mt-1 pl-14">
               Review and validate incoming capabilities
             </p>
          </div>
          
          <div className="flex items-center gap-2">
-            <div className="px-3 py-1 bg-amber-50 border border-amber-100 rounded-full flex items-center gap-2 text-xs font-medium text-amber-700">
+            <div className="px-3 py-1 bg-stone-50 dark:bg-[#2A2A2A] border border-stone-100 dark:border-white/10 rounded-full flex items-center gap-2 text-xs font-medium text-stone-700 dark:text-stone-300">
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-stone-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-stone-500"></span>
                 </span>
                 {skills.length} Pending Review
             </div>
@@ -254,11 +259,11 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
       <div className="flex-1 overflow-y-auto no-scrollbar p-6 relative z-10">
           {loading ? (
             <div className="flex justify-center items-center h-40">
-               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-500 dark:border-stone-400"></div>
             </div>
           ) : skills.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-stone-400">
-               <div className="w-20 h-20 bg-white border border-stone-100 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+            <div className="flex flex-col items-center justify-center h-64 text-stone-400 dark:text-stone-500">
+               <div className="w-20 h-20 bg-white dark:bg-[#2A2A2A] border border-stone-100 dark:border-white/5 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
                   <Briefcase size={32} className="opacity-20" />
                </div>
                <p className="text-lg font-serif opacity-60">
@@ -266,7 +271,7 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
                </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                <AnimatePresence>
                {skills.map(skill => (
                   <motion.div
@@ -277,48 +282,40 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
                     exit={{ opacity: 0, scale: 0.95 }}
                     whileHover={{ y: -4 }}
                     onClick={() => setSelectedSkill(skill)}
-                    className="bg-white/80 backdrop-blur-md rounded-2xl p-0 border border-stone-200/60 shadow-sm hover:shadow-xl hover:shadow-amber-500/10 hover:border-amber-500/40 transition-all cursor-pointer group flex flex-col h-[260px] relative overflow-hidden"
+                    className="bg-white/80 dark:bg-[#2A2A2A]/80 backdrop-blur-md rounded-xl p-0 border border-stone-200/60 dark:border-white/5 shadow-sm hover:shadow-lg hover:shadow-stone-200/50 dark:hover:shadow-black/20 hover:border-stone-300 dark:hover:border-white/20 transition-all cursor-pointer group flex flex-col h-[200px] relative overflow-hidden"
                   >
-                     {/* Decorative Top Bar */}
-                     <div className="h-1 w-full bg-gradient-to-r from-amber-500/40 to-transparent absolute top-0 left-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-
                      {/* Header Section */}
-                     <div className="p-5 pb-0 flex justify-between items-start z-10">
-                        <div className="p-2.5 bg-gradient-to-br from-amber-50 to-white border border-amber-100/50 text-amber-600 rounded-xl shadow-sm group-hover:scale-105 transition-transform duration-300">
-                           <Code size={20} strokeWidth={2} />
+                     <div className="p-4 pb-0 flex justify-between items-start z-10">
+                        <div className="p-2 bg-stone-50 dark:bg-white/5 border border-stone-100 dark:border-white/5 text-stone-600 dark:text-stone-300 rounded-lg shadow-sm group-hover:scale-105 transition-transform duration-300">
+                           <Code size={16} strokeWidth={2} />
                         </div>
                         {skill.notes && (
-                            <span className="animate-pulse flex items-center gap-1.5 text-[10px] font-bold text-amber-600 px-2.5 py-1 bg-amber-50 rounded-full border border-amber-100 uppercase tracking-wide">
-                                <AlertCircle size={10} /> Needs Review
+                            <span className="animate-pulse flex items-center gap-1.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 px-2 py-0.5 bg-amber-50 dark:bg-amber-900/20 rounded-full border border-amber-100 dark:border-amber-800/30 uppercase tracking-wide">
+                                <AlertCircle size={10} /> Review
                             </span>
                         )}
                      </div>
                      
                      {/* Content Section */}
-                     <div className="p-5 flex-1 flex flex-col z-10">
-                         <h3 className="font-serif font-medium text-lg text-[#1a1a1a] mb-2 line-clamp-1 group-hover:text-amber-600 transition-colors">
+                     <div className="p-4 flex-1 flex flex-col z-10">
+                         <h3 className="font-serif font-medium text-[15px] text-[#1a1a1a] dark:text-stone-100 mb-1 line-clamp-1 group-hover:text-stone-600 dark:group-hover:text-stone-300 transition-colors">
                             {skill.name}
                          </h3>
                          
-                         <p className="text-sm text-stone-500 leading-relaxed line-clamp-3 mb-4 flex-1">
+                         <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed line-clamp-3 mb-2 flex-1">
                             {stripMarkdown(parseSkillDescription(skill.description))}
                          </p>
 
                          {/* Footer / Meta */}
-                         <div className="pt-4 border-t border-stone-100 flex items-center justify-between text-xs text-stone-400 font-mono">
+                         <div className="pt-3 border-t border-stone-100 dark:border-white/5 flex items-center justify-between text-[10px] text-stone-400 dark:text-stone-500 font-mono">
                             <span className="flex items-center gap-1.5">
-                                <Cpu size={12} />
+                                <Cpu size={10} />
                                 <span>PYTHON</span>
                             </span>
-                            <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity text-amber-600 font-medium">
-                                INSPECT <GitPullRequest size={12} />
+                            <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity text-stone-600 dark:text-stone-300 font-medium">
+                                INSPECT <GitPullRequest size={10} />
                             </span>
                          </div>
-                     </div>
-
-                     {/* Background Tech Decoration */}
-                     <div className="absolute -bottom-6 -right-6 text-stone-50 opacity-50 group-hover:opacity-100 group-hover:text-amber-50/50 transition-all duration-500 transform rotate-12 scale-150 pointer-events-none z-0">
-                        <Code size={120} strokeWidth={1} />
                      </div>
                   </motion.div>
                ))}
@@ -333,16 +330,15 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
         onClose={() => { if(!isApproving) setSelectedSkill(null); }}
         title={
             <div className="flex items-center gap-2">
-                <GitPullRequest className="text-amber-500" size={20} />
-                <span className="font-mono text-sm tracking-wide">PR: {selectedSkill?.name}</span>
+                <GitPullRequest className="text-stone-500 dark:text-stone-400" size={20} />
+                <span className="font-mono text-sm tracking-wide dark:text-stone-200">PR: {selectedSkill?.name}</span>
             </div>
         }
-        className="max-w-7xl h-[95vh]"
+        className="max-w-7xl h-[95vh] dark:bg-[#1F1F1F]"
       >
          {selectedSkill && (
             isApproving ? (
-                <div className="p-6 h-full bg-[#FAF9F6] relative overflow-hidden">
-                    <BackgroundGrid />
+                <div className="p-6 h-full bg-[#FAF9F6] dark:bg-[#1F1F1F] relative overflow-hidden">
                     <div className="relative z-10 h-full">
                         <SkillApprovalFlow 
                             skillId={selectedSkill.id}
@@ -353,12 +349,12 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
                     </div>
                 </div>
             ) : (
-                <div className="flex flex-col h-full bg-[#FAF9F6]">
+                <div className="flex flex-col h-full bg-[#FAF9F6] dark:bg-[#1F1F1F]">
                    {/* Actions Header */}
-                   <div className="bg-white px-6 py-3 border-b border-stone-200 flex flex-wrap gap-4 justify-between items-center shrink-0">
-                      <div className="flex items-center gap-2 text-xs text-stone-400 font-mono">
-                         <div className="px-2 py-1 bg-stone-100 rounded text-stone-500">ID: {selectedSkill.id.substring(0,8)}...</div>
-                         <div className="px-2 py-1 bg-amber-50 text-amber-600 rounded border border-amber-100 flex items-center gap-1">
+                   <div className="bg-white dark:bg-[#2A2A2A] px-6 py-3 border-b border-stone-200 dark:border-white/5 flex flex-wrap gap-4 justify-between items-center shrink-0">
+                      <div className="flex items-center gap-2 text-xs text-stone-400 dark:text-stone-500 font-mono">
+                         <div className="px-2 py-1 bg-stone-100 dark:bg-white/5 rounded text-stone-500 dark:text-stone-400">ID: {selectedSkill.id.substring(0,8)}...</div>
+                         <div className="px-2 py-1 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded border border-amber-100 dark:border-amber-800/30 flex items-center gap-1">
                             <Activity size={10} /> Pending Verification
                          </div>
                       </div>
@@ -366,13 +362,13 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
                       <div className="flex items-center gap-3">
                          <button 
                             onClick={handleDelete}
-                            className="px-4 py-2 bg-white text-red-600 border border-red-200 hover:bg-red-50 hover:border-red-300 rounded-lg text-xs uppercase font-bold tracking-wide transition-all active:scale-95 flex items-center gap-2 shadow-sm"
+                            className="px-4 py-2 bg-white dark:bg-[#2A2A2A] text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-900/10 hover:border-red-300 rounded-lg text-xs uppercase font-bold tracking-wide transition-all active:scale-95 flex items-center gap-2 shadow-sm"
                           >
                             <X size={14} /> Reject
                           </button>
                           <button 
                             onClick={handleApprove}
-                            className="px-4 py-2 bg-[#1a1a1a] text-white hover:bg-black rounded-lg text-xs uppercase font-bold tracking-wide transition-all shadow-md active:scale-95 flex items-center gap-2"
+                            className="px-4 py-2 bg-[#1a1a1a] dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-stone-200 rounded-lg text-xs uppercase font-bold tracking-wide transition-all shadow-md active:scale-95 flex items-center gap-2"
                           >
                             <Check size={14} /> Approve & Save
                           </button>
@@ -383,10 +379,10 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
                    <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
                         
                         {/* Left Pane: Code Editor */}
-                        <div className="flex-1 flex flex-col border-r border-stone-200 bg-[#1e1e1e] min-w-0 min-h-[400px] lg:min-h-0">
+                        <div className="flex-1 flex flex-col border-r border-stone-200 dark:border-white/5 bg-[#1e1e1e] min-w-0 min-h-[400px] lg:min-h-0">
                             <div className="flex items-center justify-between px-4 py-2 bg-[#252526] border-b border-black/20 text-stone-400 shrink-0 select-none">
                                 <div className="flex items-center gap-2 text-xs font-mono text-[#CCCCCC]">
-                                    <Code size={14} className="text-[#34A853]" />
+                                    <Code size={14} className="text-stone-400" />
                                     <span>implementation.py</span>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -394,7 +390,7 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
                                         <button 
                                             onClick={handleSaveCode}
                                             disabled={isSaving}
-                                            className="flex items-center gap-1.5 px-3 py-1 bg-[#34A853]/20 text-[#34A853] hover:bg-[#34A853]/30 rounded text-[10px] uppercase font-bold tracking-wide transition-colors"
+                                            className="flex items-center gap-1.5 px-3 py-1 bg-stone-700 text-white hover:bg-stone-600 rounded text-[10px] uppercase font-bold tracking-wide transition-colors"
                                         >
                                             {isSaving ? <RefreshCw size={10} className="animate-spin"/> : <Save size={10} />}
                                             Save
@@ -442,23 +438,23 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
                         </div>
     
                         {/* Right Pane: Tools */}
-                        <div className="w-full lg:w-[450px] bg-stone-50/50 backdrop-blur-sm flex flex-col border-l border-stone-200 lg:h-full overflow-y-auto no-scrollbar">
+                        <div className="w-full lg:w-[450px] bg-stone-50/50 dark:bg-[#1F1F1F] backdrop-blur-sm flex flex-col border-l border-stone-200 dark:border-white/5 lg:h-full overflow-y-auto no-scrollbar">
                             <div className="p-6 flex flex-col gap-8">
                                 
                                 {/* Description */}
-                                <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm">
-                                    <h3 className="text-[11px] font-bold uppercase tracking-widest text-stone-400 mb-4 flex items-center gap-2">
-                                        <Sparkles size={12} className="text-amber-500" /> Skill Context
+                                <div className="bg-white dark:bg-[#2A2A2A] p-5 rounded-xl border border-stone-200 dark:border-white/5 shadow-sm">
+                                    <h3 className="text-[11px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-500 mb-4 flex items-center gap-2">
+                                        <Sparkles size={12} className="text-stone-500 dark:text-stone-400" /> Skill Context
                                     </h3>
-                                    <div className="text-stone-700 text-sm leading-relaxed font-sans markdown-content">
+                                    <div className="text-stone-700 dark:text-stone-300 text-sm leading-relaxed font-sans markdown-content">
                                         <ReactMarkdown
                                             components={{
-                                                h1: ({children}) => <h1 className="text-base font-bold text-[#1a1a1a] mb-2">{children}</h1>,
-                                                h2: ({children}) => <h2 className="text-sm font-bold text-[#1a1a1a] mb-1 mt-2">{children}</h2>,
-                                                p: ({children}) => <p className="mb-2 text-stone-600 text-xs leading-5">{children}</p>,
-                                                ul: ({children}) => <ul className="list-disc pl-4 mb-2 text-xs text-stone-600">{children}</ul>,
+                                                h1: ({children}) => <h1 className="text-base font-bold text-[#1a1a1a] dark:text-stone-100 mb-2">{children}</h1>,
+                                                h2: ({children}) => <h2 className="text-sm font-bold text-[#1a1a1a] dark:text-stone-100 mb-1 mt-2">{children}</h2>,
+                                                p: ({children}) => <p className="mb-2 text-stone-600 dark:text-stone-400 text-xs leading-5">{children}</p>,
+                                                ul: ({children}) => <ul className="list-disc pl-4 mb-2 text-xs text-stone-600 dark:text-stone-400">{children}</ul>,
                                                 li: ({children}) => <li className="pl-1 mb-1">{children}</li>,
-                                                code: ({children}) => <code className="bg-stone-100 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+                                                code: ({children}) => <code className="bg-stone-100 dark:bg-white/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
                                             }}
                                         >
                                             {parseSkillDescription(selectedSkill.description)}
@@ -468,22 +464,22 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
     
                                 {/* Refinement Tool */}
                                 <div>
-                                    <h3 className="text-[11px] font-bold uppercase tracking-widest text-stone-400 mb-3 flex items-center gap-2">
+                                    <h3 className="text-[11px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-500 mb-3 flex items-center gap-2">
                                         <Wand2 size={12} /> Refine with AI
                                     </h3>
-                                    <div className="bg-white rounded-xl border border-stone-200 shadow-sm focus-within:ring-2 focus-within:ring-black/5 transition-shadow overflow-hidden group">
+                                    <div className="bg-white dark:bg-[#2A2A2A] rounded-xl border border-stone-200 dark:border-white/5 shadow-sm focus-within:ring-2 focus-within:ring-black/5 dark:focus-within:ring-white/5 transition-shadow overflow-hidden group">
                                         <textarea
                                             value={refineInstruction}
                                             onChange={e => setRefineInstruction(e.target.value)}
                                             placeholder="Enter instructions to refine the code..."
-                                            className="w-full px-4 py-3 bg-transparent border-none focus:outline-none text-sm placeholder:text-stone-400 resize-none h-24"
+                                            className="w-full px-4 py-3 bg-transparent border-none focus:outline-none text-sm placeholder:text-stone-400 dark:placeholder:text-stone-500 dark:text-stone-200 resize-none h-24"
                                         />
-                                        <div className="bg-stone-50 px-3 py-2 border-t border-stone-100 flex justify-between items-center">
-                                            <span className="text-[10px] text-stone-400 font-medium px-1">AI ASSISTANT READY</span>
+                                        <div className="bg-stone-50 dark:bg-white/5 px-3 py-2 border-t border-stone-100 dark:border-white/5 flex justify-between items-center">
+                                            <span className="text-[10px] text-stone-400 dark:text-stone-500 font-medium px-1">AI ASSISTANT READY</span>
                                             <button
                                                 onClick={handleRefine}
                                                 disabled={isRefining || !refineInstruction.trim()}
-                                                className="flex items-center gap-2 px-4 py-1.5 bg-[#1a1a1a] hover:bg-black text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 shadow-sm active:scale-95"
+                                                className="flex items-center gap-2 px-4 py-1.5 bg-[#1a1a1a] dark:bg-white hover:bg-black dark:hover:bg-stone-200 text-white dark:text-black rounded-lg text-xs font-bold transition-all disabled:opacity-50 shadow-sm active:scale-95"
                                             >
                                                 {isRefining ? <RefreshCw size={12} className="animate-spin" /> : <Send size={12} />}
                                                 Refine Code
@@ -495,21 +491,19 @@ export default function SkillsPage({ apiEndpoint }: SkillsPageProps) {
                                 {/* Test & Output */}
                                 <div className="flex-1 flex flex-col">
                                     <div className="flex justify-between items-center mb-3">
-                                        <h3 className="text-[11px] font-bold uppercase tracking-widest text-stone-400 flex items-center gap-2">
+                                        <h3 className="text-[11px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-500 flex items-center gap-2">
                                             <Terminal size={12} /> Sandbox Output
                                         </h3>
                                         <button
                                             onClick={handleTest}
                                             disabled={isTesting}
-                                            className="flex items-center gap-2 px-3 py-1.5 bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 rounded-lg text-[10px] uppercase font-bold tracking-wide transition-colors shadow-sm"
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-[#2A2A2A] border border-stone-200 dark:border-white/5 hover:bg-stone-50 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 rounded-lg text-[10px] uppercase font-bold tracking-wide transition-colors shadow-sm"
                                         >
                                             {isTesting ? <RefreshCw size={12} className="animate-spin" /> : <Play size={12} fill="currentColor" />}
                                             Run Test
                                         </button>
                                     </div>
-                                    <div className="bg-[#1a1a1a] rounded-xl border border-stone-200 p-4 min-h-[150px] max-h-[300px] overflow-auto no-scrollbar font-mono text-xs shadow-inner relative">
-                                        {/* CRT Line Effect */}
-                                        <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-10 pointer-events-none opacity-20" style={{backgroundSize: "100% 2px, 3px 100%"}}></div>
+                                    <div className="bg-[#1a1a1a] rounded-xl border border-stone-200 dark:border-white/10 p-4 min-h-[150px] max-h-[300px] overflow-auto no-scrollbar font-mono text-xs shadow-inner relative">
                                         
                                         {testOutput ? (
                                             <pre className="text-stone-300 whitespace-pre-wrap break-all relative z-0">{testOutput}</pre>

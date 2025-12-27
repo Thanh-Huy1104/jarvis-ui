@@ -19,8 +19,6 @@ export default function ChatPage({ apiEndpoint }: ChatPageProps) {
     disconnect,
     clearMessages,
     sendTextMessage,
-    startRecording,
-    stopRecording
   } = useJarvis(apiEndpoint, isPersistent, sessionId);
 
   useEffect(() => {
@@ -38,11 +36,7 @@ export default function ChatPage({ apiEndpoint }: ChatPageProps) {
         onClear={clearMessages} 
         onSendMessage={sendTextMessage} 
         isConnected={status !== 'disconnected'}
-        isListening={status === 'listening'}
         isProcessing={status === 'processing'}
-        isSpeaking={status === 'speaking'}
-        onStartRecording={startRecording}
-        onStopRecording={stopRecording}
       />
     </div>
   );
